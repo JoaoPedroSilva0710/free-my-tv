@@ -315,6 +315,66 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .night #clock { color: #F5F5F7; }
 .night #clock .date { color: rgba(245, 245, 247, 0.62); }
 
+/* MARK: - Today's videos (video_feed_url): with them the picks get shorter, and the row sits above the shelf. */
+
+.has-videos .card { top: 250px; height: 232px; }
+.has-videos .card .name { top: 248px; font-size: 28px; }
+.has-videos .card .meta { top: 286px; font-size: 22px; }
+#videos { display: none; }
+.has-videos #videos { display: block; }
+#videos .head { position: absolute; left: 80px; top: 570px; font-size: 24px; font-weight: 600; color: #6E6E73; white-space: nowrap; }
+#videos .row {
+  position: absolute;
+  left: 0;
+  top: 0;
+  -webkit-transition: -webkit-transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1);
+  transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+.video {
+  position: absolute;
+  top: 608px;
+  width: 224px;
+  height: 190px;
+  -webkit-transition: -webkit-transform 0.2s cubic-bezier(0.2, 0.9, 0.3, 1.2), opacity 0.3s;
+  transition: transform 0.2s cubic-bezier(0.2, 0.9, 0.3, 1.2), opacity 0.3s;
+}
+.video.edge { opacity: 0; pointer-events: none; }
+.video .thumb {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 224px;
+  height: 126px;
+  border-radius: 14px;
+  overflow: hidden;
+  background-color: #DADADF;
+  background-size: cover;
+  background-position: center;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.14);
+}
+.video .time {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  padding: 1px 7px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #FFF;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 24px;
+}
+.video .name, .video .meta { position: absolute; left: 0; width: 224px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.video .name { top: 136px; font-size: 21px; font-weight: 600; line-height: 28px; color: #1D1D1F; }
+.video .meta { top: 164px; font-size: 18px; font-weight: 500; line-height: 24px; color: #6E6E73; }
+.video.focus { -webkit-transform: scale(1.06); transform: scale(1.06); z-index: 2; }
+.video.focus .thumb { outline: 6px solid #007AFF; outline-offset: 4px; box-shadow: 0 14px 30px rgba(0, 0, 0, 0.3); }
+.night #videos .head, .night .video .meta { color: rgba(245, 245, 247, 0.62); }
+.night .video .name { color: #F5F5F7; }
+.night .video .thumb { background-color: #2C2C2E; }
+.flat .video .thumb { box-shadow: none !important; }
+.flat #videos .row, .flat .video { will-change: transform; }
+
 /* MARK: - Shelf: the glass bar with the apps, each in its brand color; focused, a tile grows 20% and rises. */
 
 #platter {

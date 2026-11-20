@@ -852,3 +852,89 @@ var Data = (function () {
     coinName: function (i) { return i === 3 ? tr('Dollar') : ['Bitcoin', 'Ethereum', 'Solana'][i]; }
   };
 })();
+
+/**
+ * Today's videos (config.properties' video_feed_url): a JSON feed from the person's own server, newest first, fetched
+ * at start, every 5 minutes and when the home screen shows again. The last one is kept in localStorage, but only
+ * today's is ever shown (its `date` against the TV's own date): without one, the row is gone.
+ */
+var Videos = (function () {
+  'use strict';
+  var URL_ = CONFIG.videoFeedUrl || '', KEY = 'fmtv.videos', EVERY = 5 * 60000, MAX = 30;
+  var feed = null, fetchedAt = 0, busy = false, listeners = [], shownKey = '';
+  try { feed = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
+
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+  function today(at) { var d = new Date(at || Date.now()); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+
+  /** The feed's items that can be shown: a YouTube id and a title; the rest is cut to size. */
+  function clean(json) {
+    if (!json || typeof json.date !== 'string' || !json.items || !json.items.length) return {date: json && json.date, items: []};
+    var out = [];
+    for (var i = 0; i < json.items.length && out.length < MAX; i++) {
+      var v = json.items[i];
+      if (!v || typeof v.id !== 'string' || !/^[A-Za-z0-9_-]{11}$/.test(v.id) || typeof v.title !== 'string') continue;
+      out.push({
+        id: v.id,
+        title: v.title.slice(0, 200),
+        channel: typeof v.channel === 'string' ? v.channel.slice(0, 100) : '',
+        duration: typeof v.duration === 'number' && v.duration > 0 ? Math.round(v.duration) : 0
+      });
+    }
+    return {date: json.date, items: out};
+  }
+
+  function list() { return feed && feed.date === today() && feed.items ? feed.items : []; }
+
+  /** Listeners hear of a change in what shows (a new feed, or the day turning over). */
+  function changed() {
+    var items = list(), key = items.map(function (v) { return v.id; }).join(',');
+    if (key === shownKey) return;
+    shownKey = key;
+    for (var i = 0; i < listeners.length; i++) listeners[i]();
+  }
+
+  function refresh(force) {
+    if (!URL_) return;
+    changed();   // a new day empties the row even before the server answers
+    if (busy || (!force && Date.now() - fetchedAt < EVERY)) return;
+    busy = true;
+    var x = new XMLHttpRequest(), over = false;
+    function finish(json) {
+      if (over) return;
+      over = true;
+      busy = false;
+      fetchedAt = Date.now();
+      if (json) {
+        feed = clean(json);
+        try { localStorage.setItem(KEY, JSON.stringify(feed)); } catch (e) {}
+      }
+      changed();
+    }
+    x.open('GET', URL_, true);
+    x.timeout = 8000;
+    x.onreadystatechange = function () {
+      if (x.readyState !== 4 || over) return;
+      var json = null;
+      if (x.status === 200) { try { json = JSON.parse(x.responseText); } catch (e) {} }
+      finish(json);
+    };
+    x.ontimeout = x.onerror = function () { finish(null); };   // offline: the kept feed stays, if it's today's
+    x.send();
+  }
+
+  return {
+    enabled: !!URL_,
+    list: list,
+    refresh: refresh,
+    onChange: function (fn) { listeners.push(fn); },
+    today: today,
+    /** "4:05", "1:02:07". */
+    duration: function (s) {
+      if (!s) return '';
+      var h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, sec = s % 60;
+      return (h ? h + ':' + pad(m) : m) + ':' + pad(sec);
+    },
+    thumbnail: function (id) { return 'https://i.ytimg.com/vi/' + id + '/mqdefault.jpg'; }
+  };
+})();

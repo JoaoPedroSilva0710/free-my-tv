@@ -316,8 +316,8 @@ var TV = (function () {
     post('/api/v2/applications/' + hubId, 30000, done);
   }
 
-  /** A POST to the TV's own server on port 8001 (DIAL and its REST API); done(ok). */
-  function post(path, timeout, done) {
+  /** A POST to the TV's own server on port 8001 (DIAL and its REST API), with an optional body; done(ok). */
+  function post(path, timeout, done, body) {
     var x = new XMLHttpRequest(), over = false;
     x.open('POST', 'http://127.0.0.1:8001' + path, true);
     x.timeout = timeout;
@@ -328,7 +328,27 @@ var TV = (function () {
     };
     x.ontimeout = x.onerror = function () { if (!over) { over = true; if (done) done(false); } };
     x.setRequestHeader('Content-Type', 'text/plain; charset=utf-8');
-    x.send('');
+    x.send(body || '');
+  }
+
+  /**
+   * A YouTube video in Samsung's YouTube app: through DIAL with the video as its launch data (v=<id>, as a phone casts
+   * it), else an app control with the same data as PAYLOAD. YouTube's own id on 2017+ TVs, the native one on 2015's.
+   */
+  var SAMSUNG_YOUTUBE = ['9Ur5IzDKqV.TizenYouTube', '111299001912.YouTube'];
+  function samsungYouTube(video, done) {
+    function control(i) {
+      if (i >= SAMSUNG_YOUTUBE.length) { if (done) done(false); return; }
+      try {
+        var data = [new window.tizen.ApplicationControlData('PAYLOAD', [JSON.stringify({values: 'v=' + video})])];
+        var c = new window.tizen.ApplicationControl('http://tizen.org/appcontrol/operation/view', null, null, null, data);
+        window.tizen.application.launchAppControl(c, SAMSUNG_YOUTUBE[i], function () { if (done) done(true); },
+          function () { control(i + 1); });
+      } catch (e) {
+        control(i + 1);
+      }
+    }
+    post('/ws/apps/YouTube', 8000, function (ok) { if (ok) { if (done) done(true); } else control(0); }, 'v=' + video);
   }
 
   function samsungLaunch(id, done) {
@@ -566,6 +586,16 @@ var TV = (function () {
       luna('luna://com.webos.applicationManager/launch', params ? {id: id, params: params} : {id: id}, function (res) {
         if (done) done(!!res);
       });
+    },
+
+    /** A YouTube video (its 11-character id) in the TV's YouTube app; done(ok). */
+    youtube: function (video, done) {
+      if (samsung) { samsungYouTube(video, done); return; }
+      if (!webos) {
+        if (done) setTimeout(function () { done(true); }, 0);
+        return;
+      }
+      this.launch('youtube.leanback.v4', {contentTarget: 'https://www.youtube.com/tv?v=' + video}, done);
     },
 
     /** The antenna and HDMI inputs; `connected` when the TV says a device is on (when it tells). */

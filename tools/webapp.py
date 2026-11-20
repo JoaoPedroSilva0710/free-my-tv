@@ -15,17 +15,42 @@ import translate  # noqa: E402  (the catalogues and the keys the web app uses)
 
 GENERIC = {'tmdbKey': '', 'tmdbRegion': '', 'latitude': '', 'longitude': '', 'city': '', 'language': 'auto',
            'currency': '', 'temperature': 'auto', 'theme': 'auto', 'showCrypto': True, 'hideAnimation': False, 'hideApps': [],
-           'shelfApps': [], 'drawerFirst': False, 'openPicksIn': 'apps'}
+           'shelfApps': [], 'drawerFirst': False, 'openPicksIn': 'apps', 'videoFeedUrl': ''}
 
 
 def config_from_args(args):
     """The settings for these command-line arguments (--generic, --config PATH or config.properties)."""
-    if '--generic' in args:
-        return dict(GENERIC)
     path = os.path.join(ROOT, 'config.properties')
     if '--config' in args:
         path = os.path.abspath(args[args.index('--config') + 1])
+    if '--generic' in args:
+        out = dict(GENERIC)
+        # The video feed is the person's own server, not their place: a generic build keeps it when it's set.
+        if os.path.exists(path):
+            out['videoFeedUrl'] = read_config(path)['videoFeedUrl']
+        return out
     return read_config(path)
+
+
+def lan_host(host):
+    """A host on the person's own network (as build.sh's lan_host): a private IPv4, .local/.lan/.home.arpa, one word."""
+    if re.match(r'^(10\.\d+|172\.(1[6-9]|2\d|3[01])|192\.168)\.\d+\.\d+$', host):
+        return True
+    return bool(re.match(r'^[a-z0-9-]+$', host) or re.search(r'\.(local|lan|home\.arpa)$', host))
+
+
+def feed_url(value):
+    """video_feed_url: https://, or plain http:// only to the person's own network."""
+    if not value or value.startswith('https://'):
+        return value
+    if value.startswith('http://'):
+        host = re.sub(r':\d+$', '', re.split(r'[/?#]', value[7:], 1)[0]).lower()
+        if lan_host(host):
+            return value
+        sys.exit('config.properties: video_feed_url in plain http:// must be on your own network (a private address '
+                 'like 192.168.1.20, or a .local, .lan or .home.arpa name); use https:// for anything else. Got "%s"'
+                 % value)
+    sys.exit('config.properties: video_feed_url must start with http:// or https:// (got "%s")' % value)
 
 
 def read_config(path):
@@ -67,6 +92,7 @@ def read_config(path):
         'shelfApps': [s.strip() for s in values.get('shelf_apps', '').split(',') if s.strip()],
         'drawerFirst': values.get('drawer_first', 'false').lower() == 'true',
         'openPicksIn': 'nuvio' if values.get('open_picks_in', '').strip().lower() == 'nuvio' else 'apps',
+        'videoFeedUrl': feed_url(values.get('video_feed_url', '')),
     }
 
 

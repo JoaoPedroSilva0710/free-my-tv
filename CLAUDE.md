@@ -611,5 +611,11 @@ entries; its system pieces are in `PROTECTED`. USB debugging opens ADB on 5555 t
   `formatDate('format|h:mm a', at)` (the catalogue's SimpleDateFormat pattern, written by `web/strings.js`), and
   `tools/translate.py` reads those calls too. Built without a city (`--generic`), `web/zones.js`
   (`tools/make_zones.py`, from the tz database) turns the TV's time zone into the city, the currency and the region.
+  Today's videos (`video_feed_url`, LG and Samsung only): `Videos` in data.js reads a JSON feed from the person's own
+  server (`{date, items: [{id, title, channel, duration}]}`, newest first) at start, every 5 minutes and when the app
+  shows again, keeps the last one in localStorage and shows it only while its `date` is the TV's own day; home.js
+  puts it in a row above the shelf (`Z.VIDEOS`; the picks get shorter with it), and OK opens the video through
+  `TV.youtube`: on Samsung DIAL with `v=<id>` as the launch data, then an app control with it as PAYLOAD. `--generic`
+  builds keep that one line of config.properties, and plain http only goes to a private address (`feed_url`).
   `tools/webapp.py` is what both builds share. Preview: `python3 webos/build.py --preview` (or `tizen/build.py`), then
   open `out/webos/index.html` in a browser (a stand-in lists sample apps).

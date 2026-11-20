@@ -379,9 +379,9 @@
 
   // MARK: - Focus
 
-  var Z = {TOP: 'top', CARDS: 'cards', SHELF: 'shelf', DRAWER: 'drawer', APPS: 'apps', SETTINGS: 'settings', EDIT: 'edit', LANG: 'lang', CITY: 'city', KEY: 'key', ABOUT: 'about'};
-  var st = {zone: Z.SHELF, top: 0, tab: 0, card: 0, shelf: 0, drawer: 0, grid: 0, row: 0, edit: 0, lang: 0, city: 0, key: 0};
-  var cards = [];
+  var Z = {TOP: 'top', CARDS: 'cards', VIDEOS: 'videos', SHELF: 'shelf', DRAWER: 'drawer', APPS: 'apps', SETTINGS: 'settings', EDIT: 'edit', LANG: 'lang', CITY: 'city', KEY: 'key', ABOUT: 'about'};
+  var st = {zone: Z.SHELF, top: 0, tab: 0, card: 0, video: 0, shelf: 0, drawer: 0, grid: 0, row: 0, edit: 0, lang: 0, city: 0, key: 0};
+  var cards = [], videos = [];
 
   function sheetOpen() { return st.zone === Z.APPS || st.zone === Z.SETTINGS || st.zone === Z.EDIT || st.zone === Z.LANG || st.zone === Z.CITY || st.zone === Z.KEY || st.zone === Z.ABOUT; }
 
@@ -398,6 +398,9 @@
     layoutCards();
     list = $('cards').children;
     for (i = 0; i < list.length; i++) setClass(list[i], 'focus', st.zone === Z.CARDS && st.card === i);
+    layoutVideos();
+    list = $('videos').lastChild.children;
+    for (i = 0; i < list.length; i++) setClass(list[i], 'focus', st.zone === Z.VIDEOS && st.video === i);
     list = $('tiles').children;
     for (i = 0; i < list.length; i++) setClass(list[i], 'focus', st.zone === Z.SHELF && st.shelf === i);
     revealShelf();
@@ -433,6 +436,15 @@
       if (d < bestD) { bestD = d; best = i; }
     }
     return best;
+  }
+
+  /** nearest() among the videos the row shows now (it slides, so the far ones are off the screen). */
+  function nearestShown(nodes, x) {
+    var shown = [], offset = 0;
+    for (var i = 0; i < nodes.length; i++) {
+      if (hasClass(nodes[i], 'edge')) { if (!shown.length) offset++; } else shown.push(nodes[i]);
+    }
+    return shown.length ? offset + nearest(shown, x) : 0;
   }
 
   function centerX(node) {
@@ -527,6 +539,49 @@
       left += w + 40;
     }
     holder.style.webkitTransform = holder.style.transform = 'translateX(' + (-scroll) + 'px)';
+  }
+
+  // MARK: - Today's videos (video_feed_url): a row above the shelf, newest first; OK opens one in YouTube
+
+  var VIDEO_STEP = 252, VIDEOS_VISIBLE = 7;
+
+  function renderVideos() {
+    var list = Videos.list(), row = $('videos').lastChild;
+    var same = list.length === videos.length;
+    for (var i = 0; same && i < list.length; i++) same = list[i].id === videos[i].id;
+    if (same && row.children.length === list.length) return;
+    // A new feed puts the newest first: the focus stays on the video it was on, where it's still there.
+    var was = videos[st.video] ? videos[st.video].id : '';
+    videos = list;
+    setClass(body, 'has-videos', list.length > 0);
+    $('videos').firstChild.textContent = tr("Today's videos");
+    row.innerHTML = '';
+    st.video = 0;
+    for (var v = 0; v < list.length; v++) {
+      var item = list[v], node = el('div', 'video', row);
+      node.style.left = (80 + v * VIDEO_STEP) + 'px';
+      var thumb = el('div', 'thumb', node);
+      thumb.style.backgroundImage = 'url(' + Videos.thumbnail(item.id) + ')';
+      if (item.duration) el('span', 'time', thumb, Videos.duration(item.duration));
+      el('div', 'name', node, item.title);
+      el('div', 'meta', node, item.channel);
+      hover(node, Z.VIDEOS, v);
+      if (item.id === was) st.video = v;
+    }
+    if (!list.length && st.zone === Z.VIDEOS) st.zone = Z.SHELF;
+    updateFocus();
+  }
+
+  /** Past the fourth video the row slides a video at a time (only its transform animates), up to the last one. */
+  function layoutVideos() {
+    var row = $('videos').lastChild, first = Math.max(0, Math.min(st.video - 3, videos.length - VIDEOS_VISIBLE));
+    row.style.webkitTransform = row.style.transform = 'translateX(' + (-first * VIDEO_STEP) + 'px)';
+    for (var i = 0; i < row.children.length; i++) setClass(row.children[i], 'edge', i < first || i >= first + VIDEOS_VISIBLE);
+  }
+
+  function openVideo(v) {
+    if (!v) return;
+    TV.youtube(v.id, function (ok) { if (!ok) toast(trf("Couldn't open {app}.", {app: 'YouTube'})); });
   }
 
   var bgUrl = null, bgFront = 'bgA';
@@ -1409,6 +1464,9 @@
         var target = pickTarget(cards[st.card]);
         if (target) launcher(target.app.id, target.app.title, target.params)();
         return;
+      case Z.VIDEOS:
+        openVideo(videos[st.video]);
+        return;
       case Z.SHELF:
         if (shelf[st.shelf]) launcher(shelf[st.shelf].id, shelf[st.shelf].title)();
         return;
@@ -1453,19 +1511,28 @@
   }
 
   function move(dx, dy) {
-    var tiles = $('tiles').children, cardNodes = $('cards').children;
+    var tiles = $('tiles').children, cardNodes = $('cards').children, videoNodes = $('videos').lastChild.children;
     switch (st.zone) {
       case Z.SHELF:
         if (dx) st.shelf = Math.max(0, Math.min(shelf.length - 1, st.shelf + dx));
         else if (dy > 0) { openDrawer(); return; }
         else if (dy < 0) {
-          if (cards.length) { st.zone = Z.CARDS; st.card = nearest(cardNodes, centerX(tiles[st.shelf])); }
+          if (videos.length) { st.zone = Z.VIDEOS; st.video = nearestShown(videoNodes, centerX(tiles[st.shelf])); }
+          else if (cards.length) { st.zone = Z.CARDS; st.card = nearest(cardNodes, centerX(tiles[st.shelf])); }
           else { st.zone = Z.TOP; st.top = Data.hasKey() ? st.tab : 3; }
         }
+        break;
+      case Z.VIDEOS:
+        if (dx) st.video = Math.max(0, Math.min(videos.length - 1, st.video + dx));
+        else if (dy < 0) {
+          if (cards.length) { st.zone = Z.CARDS; st.card = nearest(cardNodes, centerX(videoNodes[st.video])); }
+          else { st.zone = Z.TOP; st.top = Data.hasKey() ? st.tab : 3; }
+        } else if (shelf.length) { st.zone = Z.SHELF; st.shelf = nearest(tiles, centerX(videoNodes[st.video])); }
         break;
       case Z.CARDS:
         if (dx) st.card = Math.max(0, Math.min(cards.length - 1, st.card + dx));
         else if (dy < 0) { st.zone = Z.TOP; st.top = st.tab; }
+        else if (videos.length) { st.zone = Z.VIDEOS; st.video = nearestShown(videoNodes, centerX(cardNodes[st.card])); }
         else if (shelf.length) { st.zone = Z.SHELF; st.shelf = nearest(tiles, centerX(cardNodes[st.card])); }
         break;
       case Z.TOP:
@@ -1474,6 +1541,7 @@
           if (st.top < 3) selectTab(st.top);   // as on Apple TV: focusing a tab selects it
         } else if (dy > 0) {
           if (cards.length) { st.zone = Z.CARDS; st.card = Math.min(cards.length - 1, st.top < 3 ? 0 : cards.length - 1); }
+          else if (videos.length) { st.zone = Z.VIDEOS; st.video = 0; }
           else st.zone = Z.SHELF;
         }
         break;
@@ -1538,6 +1606,7 @@
       st.zone = zone;
       if (zone === Z.TOP) { st.top = index; if (index < 3) selectTab(index); }
       else if (zone === Z.CARDS) st.card = index;
+      else if (zone === Z.VIDEOS) st.video = index;
       else if (zone === Z.SHELF) st.shelf = index;
       else if (zone === Z.DRAWER) st.drawer = index;
       else if (zone === Z.APPS) st.grid = index;
@@ -1743,6 +1812,7 @@
     renderQuotes();
     cards = [];
     renderCards();
+    renderVideos();
     renderShelf();
     renderDrawer();
     renderClock();
@@ -1789,10 +1859,13 @@
     st.zone = Z.SHELF;
     st.shelf = 0;
     st.card = 0;
+    st.video = 0;
     selectTab(0);
     updateFocus();
     restInDrawer();   // drawer_first: out again at once, not only after the TV lists its apps
   }
+
+  Videos.onChange(renderVideos);
 
   Data.onChange(function () {
     renderQuotes();
@@ -1814,6 +1887,7 @@
     if (window.PalmSystem && window.PalmSystem.activate) window.PalmSystem.activate();
     reset();
     loadApps(function () { renderShelf(); renderDrawer(); restInDrawer(); Data.refresh(); });
+    Videos.refresh(true);
   }
 
   window.addEventListener('resize', fit);
@@ -1822,6 +1896,7 @@
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) { hideSaver(); hideAmbient(); return; }
     idleAt = Date.now();
+    Videos.refresh(true);
     loadApps(function () { renderShelf(); renderDrawer(); updateFocus(); Data.refresh(); });
   });
 
@@ -1838,9 +1913,11 @@
     restInDrawer();
     Data.refresh();
   });
+  Videos.refresh(true);
   setInterval(function () {
     checkNight();
     Data.refresh();
+    Videos.refresh(false);   // every 5 minutes, and the row goes at midnight
     applyDim();   // automatic: medium from 22:00, off again at 07:00
     if (!saverOn && !ambientOn && !sheetOpen() && Date.now() - idleAt > SAVER_AFTER) {
       if (saverMode() === 'clock') showAmbient(); else showSaver();
