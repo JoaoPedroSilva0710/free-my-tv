@@ -1763,9 +1763,19 @@
     TV.apps(function (list) {
       apps = list.filter(function (a) { return !hidden(a); });
       Data.setApps(apps);
-      pickShelf();
       TV.inputs(function (list2) {
         inputs = list2;
+        if (TV.name === 'tizen') {
+          var port = inputs.filter(function (x) { return x.key === 'hdmi4'; })[0];
+          var pc = port && {id: port.id, title: 'PC', icon: 'icons/hdmi.svg', color: '#242A32'};
+          if (pc && !hidden(pc)) apps = apps.concat([pc]); else pc = null;
+        }
+        pickShelf();
+        if (pc && !Prefs.pcShortcutAdded()) {
+          var chosen = (Prefs.shelf() || shelf.map(function (a) { return a.id; })).slice();
+          if (chosen.indexOf(pc.id) < 0) { chosen.unshift(pc.id); Prefs.set('shelf', chosen); pickShelf(); }
+          Prefs.set('pcShortcutAdded', true);
+        }
         if (done) done();
       });
     });
