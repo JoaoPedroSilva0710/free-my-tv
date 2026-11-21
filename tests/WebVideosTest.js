@@ -74,5 +74,6 @@ assert.strictEqual(V.duration(245), '4:05');
 assert.strictEqual(V.duration(3727), '1:02:07');
 assert.strictEqual(V.duration(0), '');
 assert.strictEqual(V.thumbnail('dQw4w9WgXcQ'), 'https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg');
+assert.strictEqual(V.thumbnail('dQw4w9WgXcQ', true), 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hq720.jpg');
 
 console.log('WebVideosTest: all checks passed.');

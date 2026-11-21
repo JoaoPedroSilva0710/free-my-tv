@@ -935,6 +935,7 @@ var Videos = (function () {
       var h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, sec = s % 60;
       return (h ? h + ':' + pad(m) : m) + ':' + pad(sec);
     },
-    thumbnail: function (id) { return 'https://i.ytimg.com/vi/' + id + '/mqdefault.jpg'; }
+    /** 16:9 thumbnails: 320×180, or with `large` 1280×720 (hq720, which some videos lack). */
+    thumbnail: function (id, large) { return 'https://i.ytimg.com/vi/' + id + (large ? '/hq720.jpg' : '/mqdefault.jpg'); }
   };
 })();

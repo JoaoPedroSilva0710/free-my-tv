@@ -543,7 +543,7 @@
 
   // MARK: - Today's videos (video_feed_url): a row above the shelf, newest first; OK opens one in YouTube
 
-  var VIDEO_STEP = 448, VIDEOS_VISIBLE = 4;
+  var VIDEO_LEFT = 48, VIDEO_STEP = 462, VIDEOS_VISIBLE = 4;   // 4 × 438 + 3 × 24 = 1824 = 1920 − 2 × 48
 
   function renderVideos() {
     var list = Videos.list(), row = $('videos').lastChild;
@@ -559,9 +559,10 @@
     st.video = 0;
     for (var v = 0; v < list.length; v++) {
       var item = list[v], node = el('div', 'video', row);
-      node.style.left = (80 + v * VIDEO_STEP) + 'px';
+      node.style.left = (VIDEO_LEFT + v * VIDEO_STEP) + 'px';
       var thumb = el('div', 'thumb', node);
-      thumb.style.backgroundImage = 'url(' + Videos.thumbnail(item.id) + ')';
+      // The 1280 px image on top, the small one under it where a video has no large one; set once it's near the screen.
+      thumb.setAttribute('data-image', 'url(' + Videos.thumbnail(item.id, true) + '), url(' + Videos.thumbnail(item.id) + ')');
       if (item.duration) el('span', 'time', thumb, Videos.duration(item.duration));
       el('div', 'name', node, item.title);
       el('div', 'meta', node, item.channel);
@@ -576,7 +577,15 @@
   function layoutVideos() {
     var row = $('videos').lastChild, first = Math.max(0, Math.min(st.video - 2, videos.length - VIDEOS_VISIBLE));
     row.style.webkitTransform = row.style.transform = 'translateX(' + (-first * VIDEO_STEP) + 'px)';
-    for (var i = 0; i < row.children.length; i++) setClass(row.children[i], 'edge', i < first || i >= first + VIDEOS_VISIBLE);
+    for (var i = 0; i < row.children.length; i++) {
+      var node = row.children[i], thumb = node.firstChild;
+      setClass(node, 'edge', i < first || i >= first + VIDEOS_VISIBLE);
+      // The large thumbnails take ~3.7 MB each once decoded: only the shown ones and one on each side load.
+      if (i >= first - 1 && i <= first + VIDEOS_VISIBLE && thumb.getAttribute('data-image')) {
+        thumb.style.backgroundImage = thumb.getAttribute('data-image');
+        thumb.removeAttribute('data-image');
+      }
+    }
   }
 
   function openVideo(v) {
