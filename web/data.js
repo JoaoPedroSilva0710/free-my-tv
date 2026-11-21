@@ -854,15 +854,25 @@ var Data = (function () {
 })();
 
 /**
- * Today's videos (config.properties' video_feed_url): a JSON feed from the person's own server, newest first, fetched
- * at start, every minute (a small request on the home network, so a new list shows soon) and when the home screen
- * shows again. The last one is kept in localStorage, but only
- * today's is ever shown (its `date` against the TV's own date): without one, the row is gone.
+ * Today's videos (config.properties' video_feed_url): a JSON feed from the person's own server, newest first.
+ *
+ * Observer: while the home screen shows, an EventSource on the same URL subscribes to the server (Accept:
+ * text/event-stream). The server sends the current feed at once, then a `feed` event only when a list changes, so the
+ * TV never polls. Hidden, the connection closes (Tizen suspends hidden apps anyway); shown again, it opens again and
+ * the first event brings what it missed. A dropped connection comes back by itself (the server's `retry:`); a server
+ * that refuses the stream (an older bot) gets a single JSON GET and another try later, 1 minute at first and up to
+ * 30. TVs without EventSource (Tizen 2.x) read the JSON when the app shows and every 5 minutes.
+ *
+ * The last feed is kept in localStorage, but only today's is ever shown (its `date` against the TV's own date, checked
+ * every 30 seconds without the network): without one, the row is gone.
  */
 var Videos = (function () {
   'use strict';
-  var URL_ = CONFIG.videoFeedUrl || '', KEY = 'fmtv.videos', EVERY = 60000, MAX = 30;
+  var URL_ = CONFIG.videoFeedUrl || '', KEY = 'fmtv.videos', POLL = 5 * 60000, MAX = 30;
+  var RETRY_FIRST = 60000, RETRY_MAX = 30 * 60000;
   var feed = null, fetchedAt = 0, busy = false, listeners = [], shownKey = '';
+  var source = null, retryIn = RETRY_FIRST, retryTimer = 0, wanted = false;
+  var streams = typeof window !== 'undefined' && typeof window.EventSource === 'function';
   try { feed = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
 
   function pad(n) { return (n < 10 ? '0' : '') + n; }
@@ -895,10 +905,18 @@ var Videos = (function () {
     for (var i = 0; i < listeners.length; i++) listeners[i]();
   }
 
+  /** A feed from the server (an event or a GET): kept, and shown if it's today's. */
+  function receive(json) {
+    feed = clean(json);
+    try { localStorage.setItem(KEY, JSON.stringify(feed)); } catch (e) {}
+    changed();
+  }
+
+  /** One GET of the JSON: TVs without EventSource, and while a refused stream waits to try again. */
   function refresh(force) {
     if (!URL_) return;
     changed();   // a new day empties the row even before the server answers
-    if (busy || (!force && Date.now() - fetchedAt < EVERY)) return;
+    if (busy || (!force && Date.now() - fetchedAt < POLL)) return;
     busy = true;
     var x = new XMLHttpRequest(), over = false;
     function finish(json) {
@@ -906,11 +924,7 @@ var Videos = (function () {
       over = true;
       busy = false;
       fetchedAt = Date.now();
-      if (json) {
-        feed = clean(json);
-        try { localStorage.setItem(KEY, JSON.stringify(feed)); } catch (e) {}
-      }
-      changed();
+      if (json) receive(json); else changed();
     }
     x.open('GET', URL_, true);
     x.timeout = 8000;
@@ -924,10 +938,59 @@ var Videos = (function () {
     x.send();
   }
 
+  function subscribe() {
+    clearTimeout(retryTimer);
+    retryTimer = 0;
+    if (!wanted || source) return;
+    try { source = new window.EventSource(URL_); } catch (e) { source = null; refresh(true); return; }
+    source.addEventListener('feed', function (e) {
+      retryIn = RETRY_FIRST;
+      var json = null;
+      try { json = JSON.parse(e.data); } catch (err) {}
+      if (json) receive(json);
+    });
+    source.onerror = function () {
+      // CONNECTING: the browser tries again by itself. CLOSED: the server refused the stream; read it once, retry later.
+      if (!source || source.readyState !== 2) return;
+      source = null;
+      refresh(true);
+      if (wanted) retryTimer = setTimeout(subscribe, retryIn);
+      retryIn = Math.min(RETRY_MAX, retryIn * 2);
+    };
+  }
+
+  /** The home screen shows: subscribe (or, without EventSource, read the feed now). */
+  function connect() {
+    if (!URL_) return;
+    changed();
+    if (!streams) { refresh(true); return; }
+    wanted = true;
+    subscribe();
+  }
+
+  /** The home screen is hidden: no connection held while nothing shows. */
+  function disconnect() {
+    wanted = false;
+    clearTimeout(retryTimer);
+    retryTimer = 0;
+    if (source) { source.close(); source = null; }
+  }
+
+  /** Every 30 seconds: the day turning over empties the row; without EventSource, the 5-minute read. */
+  function check() {
+    if (!URL_) return;
+    if (streams) changed(); else refresh(false);
+  }
+
   return {
     enabled: !!URL_,
     list: list,
+    connect: connect,
+    disconnect: disconnect,
+    check: check,
     refresh: refresh,
+    /** Whether it's subscribed now (tests). */
+    subscribed: function () { return !!source; },
     onChange: function (fn) { listeners.push(fn); },
     today: today,
     /** "4:05", "1:02:07". */

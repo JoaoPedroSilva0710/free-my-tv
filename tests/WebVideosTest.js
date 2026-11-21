@@ -1,4 +1,5 @@
-/* Today's videos: only the TV's own day is shown, bad items are dropped, and the feed is fetched and kept. */
+/* Today's videos: only the TV's own day is shown, bad items are dropped, the feed is kept, and the TV subscribes
+   (EventSource) instead of polling, with a single GET where the server refuses the stream or there's no EventSource. */
 'use strict';
 var fs = require('fs'), path = require('path'), vm = require('vm'), assert = require('assert');
 var source = fs.readFileSync(path.join(__dirname, '..', 'web', 'data.js'), 'utf8');
@@ -6,8 +7,12 @@ var from = source.indexOf('var Videos = (function');
 assert(from >= 0, 'Videos found in data.js');
 var code = source.slice(from);
 
-function setup(stored, url) {
-  var storage = {}, requests = [];
+function setup(stored, url, withStreams) {
+  var storage = {}, requests = [], sources = [], timers = [];
+  function FakeSource(u) { this.url = u; this.readyState = 0; this.handlers = {}; this.closed = false; sources.push(this); }
+  FakeSource.prototype.addEventListener = function (name, fn) { this.handlers[name] = fn; };
+  FakeSource.prototype.close = function () { this.closed = true; this.readyState = 2; };
+  FakeSource.prototype.emit = function (body) { this.readyState = 1; this.handlers.feed({data: JSON.stringify(body)}); };
   if (stored) storage['fmtv.videos'] = JSON.stringify(stored);
   function XHR() { requests.push(this); }
   XHR.prototype.open = function (method, u) { this.method = method; this.url = u; };
@@ -21,10 +26,13 @@ function setup(stored, url) {
       getItem: function (k) { return storage[k] === undefined ? null : storage[k]; },
       setItem: function (k, v) { storage[k] = v; }
     },
-    XMLHttpRequest: XHR, Date: Date, JSON: JSON, Math: Math
+    XMLHttpRequest: XHR, Date: Date, JSON: JSON, Math: Math,
+    window: withStreams ? {EventSource: FakeSource} : {},
+    setTimeout: function (fn, ms) { timers.push({fn: fn, ms: ms}); return timers.length; },
+    clearTimeout: function () {}
   });
   vm.runInContext(code + '\nthis.Videos = Videos;', context);
-  return {Videos: context.Videos, requests: requests, storage: storage};
+  return {Videos: context.Videos, requests: requests, storage: storage, sources: sources, timers: timers};
 }
 
 var V = setup(null, '').Videos, today = V.today();
@@ -57,7 +65,7 @@ assert.strictEqual(heard, 1);
 assert.strictEqual(JSON.parse(h.storage['fmtv.videos']).date, today);
 assert.strictEqual(list[0].reason, undefined, 'only what the row shows is kept');
 
-// Within a minute, only a forced refresh fetches again; a failed fetch keeps today's feed.
+// Within 5 minutes, only a forced refresh fetches again; a failed fetch keeps today's feed.
 h.Videos.refresh(false);
 assert.strictEqual(h.requests.length, 1);
 h.Videos.refresh(true);
@@ -69,6 +77,50 @@ h.Videos.refresh(true);
 h.requests[2].answer(200, {date: yesterday, items: [item]});
 assert.strictEqual(h.Videos.list().length, 0);
 assert.strictEqual(heard, 2);
+
+// Observer: connect subscribes (no GET), each event replaces the feed, hidden closes the connection.
+var o = setup(null, undefined, true), seen = 0;
+o.Videos.onChange(function () { seen++; });
+o.Videos.connect();
+assert.strictEqual(o.sources.length, 1);
+assert.strictEqual(o.sources[0].url, 'http://192.168.1.20:3330/tv.json');
+assert.strictEqual(o.requests.length, 0, 'no polling while subscribed');
+o.sources[0].emit({date: today, items: [item]});
+assert.strictEqual(o.Videos.list().length, 1);
+o.sources[0].emit({date: today, items: [{id: 'newestVideo', title: 'Newest'}, item]});
+assert.deepEqual(Array.from(o.Videos.list(), function (v) { return v.id; }), ['newestVideo', 'dQw4w9WgXcQ']);
+assert.strictEqual(seen, 2);
+o.Videos.connect();
+assert.strictEqual(o.sources.length, 1, 'connect twice keeps one subscription');
+o.Videos.check();
+assert.strictEqual(o.requests.length, 0, 'the 30 s tick checks only the date');
+o.Videos.disconnect();
+assert.ok(o.sources[0].closed);
+assert.strictEqual(o.Videos.subscribed(), false);
+o.Videos.connect();
+assert.strictEqual(o.sources.length, 2, 'shown again: subscribed again');
+
+// A dropped connection (CONNECTING) is left to the browser; a refused stream (CLOSED) reads once and retries later.
+o.sources[1].readyState = 0;
+o.sources[1].onerror();
+assert.strictEqual(o.requests.length, 0);
+o.sources[1].readyState = 2;
+o.sources[1].onerror();
+assert.strictEqual(o.requests.length, 1);
+assert.strictEqual(o.timers[o.timers.length - 1].ms, 60000);
+o.timers[o.timers.length - 1].fn();
+assert.strictEqual(o.sources.length, 3);
+o.sources[2].readyState = 2;
+o.sources[2].onerror();
+assert.strictEqual(o.timers[o.timers.length - 1].ms, 120000, 'each refusal waits twice as long');
+
+// Without EventSource: a GET when shown, and the tick reads again only after 5 minutes.
+var p = setup(null, undefined, false);
+p.Videos.connect();
+assert.strictEqual(p.requests.length, 1);
+p.requests[0].answer(200, {date: today, items: [item]});
+p.Videos.check();
+assert.strictEqual(p.requests.length, 1);
 
 assert.strictEqual(V.duration(245), '4:05');
 assert.strictEqual(V.duration(3727), '1:02:07');

@@ -1896,16 +1896,16 @@
     if (window.PalmSystem && window.PalmSystem.activate) window.PalmSystem.activate();
     reset();
     loadApps(function () { renderShelf(); renderDrawer(); restInDrawer(); Data.refresh(); });
-    Videos.refresh(true);
+    Videos.connect();
   }
 
   window.addEventListener('resize', fit);
   document.addEventListener('webOSRelaunch', reopened);   // LG: opened again while running
   window.addEventListener('appcontrol', reopened);        // Samsung: the same
   document.addEventListener('visibilitychange', function () {
-    if (document.hidden) { hideSaver(); hideAmbient(); return; }
+    if (document.hidden) { hideSaver(); hideAmbient(); Videos.disconnect(); return; }
     idleAt = Date.now();
-    Videos.refresh(true);
+    Videos.connect();   // the first event brings the list made while hidden
     loadApps(function () { renderShelf(); renderDrawer(); updateFocus(); Data.refresh(); });
   });
 
@@ -1922,11 +1922,11 @@
     restInDrawer();
     Data.refresh();
   });
-  Videos.refresh(true);
+  Videos.connect();   // subscribed: the server tells when a new list comes
   setInterval(function () {
     checkNight();
     Data.refresh();
-    Videos.refresh(false);   // every minute, and the row goes at midnight
+    Videos.check();   // the day turning over (no network); only TVs without EventSource read the feed here
     applyDim();   // automatic: medium from 22:00, off again at 07:00
     if (!saverOn && !ambientOn && !sheetOpen() && Date.now() - idleAt > SAVER_AFTER) {
       if (saverMode() === 'clock') showAmbient(); else showSaver();

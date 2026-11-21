@@ -612,8 +612,13 @@ entries; its system pieces are in `PROTECTED`. USB debugging opens ADB on 5555 t
   `tools/translate.py` reads those calls too. Built without a city (`--generic`), `web/zones.js`
   (`tools/make_zones.py`, from the tz database) turns the TV's time zone into the city, the currency and the region.
   Today's videos (`video_feed_url`, LG and Samsung only): `Videos` in data.js reads a JSON feed from the person's own
-  server (`{date, items: [{id, title, channel, duration}]}`, newest first) at start, every minute and when the app
-  shows again, keeps the last one in localStorage and shows it only while its `date` is the TV's own day; home.js
+  server (`{date, items: [{id, title, channel, duration}]}`, newest first). It doesn't poll: while the home screen
+  shows, an EventSource on the same URL (Accept: text/event-stream) subscribes, gets the feed at once and then a
+  `feed` event only when the server publishes a change (Observer); hidden, `Videos.disconnect()` closes it, and shown
+  again `Videos.connect()` subscribes again. A server that refuses the stream gets one GET and another try 1 to 30
+  minutes later; TVs without EventSource read the JSON when shown and every 5 minutes. The 30-second tick
+  (`Videos.check()`) only compares dates. It keeps the last feed in localStorage and shows it only while its `date`
+  is the TV's own day; home.js
   puts it in a row above the shelf (`Z.VIDEOS`; the picks get shorter with it), and OK opens the video through
   `TV.youtube`: on Samsung DIAL with `v=<id>` as the launch data, then an app control with it as PAYLOAD. `--generic`
   builds keep that one line of config.properties, and plain http only goes to a private address (`feed_url`).
