@@ -48,4 +48,5 @@ Base commit: `ed6be1ecaa98804c383fa021cdb648fd80f061f3`.
 ## Fileira de vídeos sem título — 2026-11-20
 
 - The "Vídeos de hoje" heading above the videos row is gone: `web/index.html` drops `#videos .head`, `web/home.js` no longer fills it, and `web/home.css` drops its rules (also in `.night` and `.no-picks`). The row itself, its position, focus and feed are unchanged. The now unused `Today's videos` key was removed from all 27 catalogues.
-- `bash tools/check.sh web` passed (452 keys, catalogues match the code). Not installed on the TV in this step.
+- The row moved up into the heading's place, 48 px: the thumbnails start at 402 px with picks and 236 px without (where the heading was). Checked in headless Firefox with the real feed: the row sits right under the clock and the coins line.
+- `bash tools/check.sh web` passed (452 keys, catalogues match the code). `python3 tizen/build.py --generic --preview` built the unsigned `FreeMyTV-tizen.wgt`; `controle-tv`'s `ferramentas/instalar.js` installed it over the existing app (re-signed, `install completed`, signing configuration restored; no uninstall, no data clear). The row on the TV screen still needs a check by eye.
