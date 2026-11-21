@@ -619,7 +619,7 @@ entries; its system pieces are in `PROTECTED`. USB debugging opens ADB on 5555 t
   minutes later; TVs without EventSource read the JSON when shown and every 5 minutes. The 30-second tick
   (`Videos.check()`) only compares dates. It keeps the last feed in localStorage and shows it only while its `date`
   is the TV's own day; home.js
-  puts it in a row above the shelf (`Z.VIDEOS`; the picks get shorter with it), and OK opens the video through
+  puts it in a row above the shelf, without a heading (`Z.VIDEOS`; the picks get shorter with it), and OK opens the video through
   `TV.youtube`: on Samsung DIAL with `v=<id>` as the launch data, then an app control with it as PAYLOAD. `--generic`
   builds keep that one line of config.properties, and plain http only goes to a private address (`feed_url`).
   `tools/webapp.py` is what both builds share. Preview: `python3 webos/build.py --preview` (or `tizen/build.py`), then

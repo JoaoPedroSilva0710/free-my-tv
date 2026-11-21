@@ -554,7 +554,6 @@
     var was = videos[st.video] ? videos[st.video].id : '';
     videos = list;
     setClass(body, 'has-videos', list.length > 0);
-    $('videos').firstChild.textContent = tr("Today's videos");
     row.innerHTML = '';
     st.video = 0;
     for (var v = 0; v < list.length; v++) {
