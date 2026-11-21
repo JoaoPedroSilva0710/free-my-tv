@@ -543,7 +543,7 @@
 
   // MARK: - Today's videos (video_feed_url): a row above the shelf, newest first; OK opens one in YouTube
 
-  var VIDEO_STEP = 252, VIDEOS_VISIBLE = 7;
+  var VIDEO_STEP = 448, VIDEOS_VISIBLE = 4;
 
   function renderVideos() {
     var list = Videos.list(), row = $('videos').lastChild;
@@ -572,9 +572,9 @@
     updateFocus();
   }
 
-  /** Past the fourth video the row slides a video at a time (only its transform animates), up to the last one. */
+  /** Past the third video the row slides a video at a time (only its transform animates), up to the last one. */
   function layoutVideos() {
-    var row = $('videos').lastChild, first = Math.max(0, Math.min(st.video - 3, videos.length - VIDEOS_VISIBLE));
+    var row = $('videos').lastChild, first = Math.max(0, Math.min(st.video - 2, videos.length - VIDEOS_VISIBLE));
     row.style.webkitTransform = row.style.transform = 'translateX(' + (-first * VIDEO_STEP) + 'px)';
     for (var i = 0; i < row.children.length; i++) setClass(row.children[i], 'edge', i < first || i >= first + VIDEOS_VISIBLE);
   }

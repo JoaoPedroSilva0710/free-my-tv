@@ -315,14 +315,17 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .night #clock { color: #F5F5F7; }
 .night #clock .date { color: rgba(245, 245, 247, 0.62); }
 
-/* MARK: - Today's videos (video_feed_url): with them the picks get shorter, and the row sits above the shelf. */
+/* MARK: - Today's videos (video_feed_url): large thumbnails above the shelf. With them the clock moves to the top
+   corner, small, and the picks become a thin row of their titles' images. */
 
-.has-videos .card { top: 250px; height: 232px; }
-.has-videos .card .name { top: 248px; font-size: 28px; }
-.has-videos .card .meta { top: 286px; font-size: 22px; }
+.has-videos #clock { top: 56px; font-size: 64px; font-weight: 300; }
+.has-videos #clock .date { font-size: 26px; margin-top: 8px; }
+.has-videos .card { top: 228px; height: 120px; }
+.has-videos .card .name { top: 130px; font-size: 26px; }
+.has-videos .card .meta { display: none; }
 #videos { display: none; }
 .has-videos #videos { display: block; }
-#videos .head { position: absolute; left: 80px; top: 570px; font-size: 24px; font-weight: 600; color: #6E6E73; white-space: nowrap; }
+#videos .head { position: absolute; left: 80px; top: 396px; font-size: 30px; font-weight: 600; color: #6E6E73; white-space: nowrap; }
 #videos .row {
   position: absolute;
   left: 0;
@@ -332,9 +335,9 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 }
 .video {
   position: absolute;
-  top: 608px;
-  width: 224px;
-  height: 190px;
+  top: 448px;
+  width: 416px;
+  height: 330px;
   -webkit-transition: -webkit-transform 0.2s cubic-bezier(0.2, 0.9, 0.3, 1.2), opacity 0.3s;
   transition: transform 0.2s cubic-bezier(0.2, 0.9, 0.3, 1.2), opacity 0.3s;
 }
@@ -343,32 +346,32 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   position: absolute;
   left: 0;
   top: 0;
-  width: 224px;
-  height: 126px;
-  border-radius: 14px;
+  width: 416px;
+  height: 234px;
+  border-radius: 20px;
   overflow: hidden;
   background-color: #DADADF;
   background-size: cover;
   background-position: center;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.14);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.16);
 }
 .video .time {
   position: absolute;
-  right: 8px;
-  bottom: 8px;
-  padding: 1px 7px;
-  border-radius: 6px;
+  right: 12px;
+  bottom: 12px;
+  padding: 2px 10px;
+  border-radius: 8px;
   background: rgba(0, 0, 0, 0.72);
   color: #FFF;
-  font-size: 17px;
+  font-size: 22px;
   font-weight: 600;
-  line-height: 24px;
+  line-height: 30px;
 }
-.video .name, .video .meta { position: absolute; left: 0; width: 224px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.video .name { top: 136px; font-size: 21px; font-weight: 600; line-height: 28px; color: #1D1D1F; }
-.video .meta { top: 164px; font-size: 18px; font-weight: 500; line-height: 24px; color: #6E6E73; }
-.video.focus { -webkit-transform: scale(1.06); transform: scale(1.06); z-index: 2; }
-.video.focus .thumb { outline: 6px solid #007AFF; outline-offset: 4px; box-shadow: 0 14px 30px rgba(0, 0, 0, 0.3); }
+.video .name, .video .meta { position: absolute; left: 0; width: 416px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.video .name { top: 248px; font-size: 28px; font-weight: 600; line-height: 36px; color: #1D1D1F; }
+.video .meta { top: 286px; font-size: 23px; font-weight: 500; line-height: 30px; color: #6E6E73; }
+.video.focus { -webkit-transform: scale(1.05); transform: scale(1.05); z-index: 2; }
+.video.focus .thumb { outline: 6px solid #007AFF; outline-offset: 4px; box-shadow: 0 18px 40px rgba(0, 0, 0, 0.32); }
 .night #videos .head, .night .video .meta { color: rgba(245, 245, 247, 0.62); }
 .night .video .name { color: #F5F5F7; }
 .night .video .thumb { background-color: #2C2C2E; }
