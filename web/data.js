@@ -855,12 +855,13 @@ var Data = (function () {
 
 /**
  * Today's videos (config.properties' video_feed_url): a JSON feed from the person's own server, newest first, fetched
- * at start, every 5 minutes and when the home screen shows again. The last one is kept in localStorage, but only
+ * at start, every minute (a small request on the home network, so a new list shows soon) and when the home screen
+ * shows again. The last one is kept in localStorage, but only
  * today's is ever shown (its `date` against the TV's own date): without one, the row is gone.
  */
 var Videos = (function () {
   'use strict';
-  var URL_ = CONFIG.videoFeedUrl || '', KEY = 'fmtv.videos', EVERY = 5 * 60000, MAX = 30;
+  var URL_ = CONFIG.videoFeedUrl || '', KEY = 'fmtv.videos', EVERY = 60000, MAX = 30;
   var feed = null, fetchedAt = 0, busy = false, listeners = [], shownKey = '';
   try { feed = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
 

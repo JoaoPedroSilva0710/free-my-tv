@@ -1926,7 +1926,7 @@
   setInterval(function () {
     checkNight();
     Data.refresh();
-    Videos.refresh(false);   // every 5 minutes, and the row goes at midnight
+    Videos.refresh(false);   // every minute, and the row goes at midnight
     applyDim();   // automatic: medium from 22:00, off again at 07:00
     if (!saverOn && !ambientOn && !sheetOpen() && Date.now() - idleAt > SAVER_AFTER) {
       if (saverMode() === 'clock') showAmbient(); else showSaver();

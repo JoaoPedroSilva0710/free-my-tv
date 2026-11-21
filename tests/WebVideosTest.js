@@ -57,7 +57,7 @@ assert.strictEqual(heard, 1);
 assert.strictEqual(JSON.parse(h.storage['fmtv.videos']).date, today);
 assert.strictEqual(list[0].reason, undefined, 'only what the row shows is kept');
 
-// Within 5 minutes, only a forced refresh fetches again; a failed fetch keeps today's feed.
+// Within a minute, only a forced refresh fetches again; a failed fetch keeps today's feed.
 h.Videos.refresh(false);
 assert.strictEqual(h.requests.length, 1);
 h.Videos.refresh(true);
