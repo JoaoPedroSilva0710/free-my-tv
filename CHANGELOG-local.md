@@ -50,3 +50,9 @@ Base commit: `ed6be1ecaa98804c383fa021cdb648fd80f061f3`.
 - The "Vídeos de hoje" heading above the videos row is gone: `web/index.html` drops `#videos .head`, `web/home.js` no longer fills it, and `web/home.css` drops its rules (also in `.night` and `.no-picks`). The row itself, its position, focus and feed are unchanged. The now unused `Today's videos` key was removed from all 27 catalogues.
 - The row moved up into the heading's place, 48 px: the thumbnails start at 402 px with picks and 236 px without (where the heading was). Checked in headless Firefox with the real feed: the row sits right under the clock and the coins line.
 - `bash tools/check.sh web` passed (452 keys, catalogues match the code). `python3 tizen/build.py --generic --preview` built the unsigned `FreeMyTV-tizen.wgt`; `controle-tv`'s `ferramentas/instalar.js` installed it over the existing app (re-signed, `install completed`, signing configuration restored; no uninstall, no data clear). The row on the TV screen still needs a check by eye.
+
+## Vídeos de hoje: TV ligada antes do PC — 2026-11-22
+
+- Bug: with the PC off, Tizen's EventSource ends CLOSED (not CONNECTING), which `Videos` took for an older bot refusing the stream, so each failure doubled the wait (1, 2, 4, 8, 16, up to 30 min). With the TV on before the PC, the row stayed empty for many minutes after the bot was up (the bot's `/health` showed 0 subscribers).
+- Fix (`web/data.js`): after a CLOSED stream, the single GET tells the two apart. Nothing answers (`status 0`, error or timeout) → try again every 15 s (`RETRY_OFFLINE`), no doubling; the server answers but refuses the stream → the 1 to 30 min backoff as before. Hidden meanwhile → no retry.
+- `tests/WebVideosTest.js` covers both; `bash tools/check.sh web` passed.

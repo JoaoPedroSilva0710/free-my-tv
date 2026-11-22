@@ -107,12 +107,33 @@ assert.strictEqual(o.requests.length, 0);
 o.sources[1].readyState = 2;
 o.sources[1].onerror();
 assert.strictEqual(o.requests.length, 1);
+o.requests[0].answer(200, {date: today, items: [item]});
 assert.strictEqual(o.timers[o.timers.length - 1].ms, 60000);
 o.timers[o.timers.length - 1].fn();
 assert.strictEqual(o.sources.length, 3);
 o.sources[2].readyState = 2;
 o.sources[2].onerror();
+o.requests[1].answer(200, {date: today, items: [item]});
 assert.strictEqual(o.timers[o.timers.length - 1].ms, 120000, 'each refusal waits twice as long');
+
+// The PC off (the TV turned on first): nothing answers, so it tries again every 15 s, without waiting longer.
+var off = setup(null, undefined, true);
+off.Videos.connect();
+for (var n = 0; n < 4; n++) {
+  off.sources[n].readyState = 2;
+  off.sources[n].onerror();
+  off.requests[n].onerror();
+  assert.strictEqual(off.timers[off.timers.length - 1].ms, 15000, 'unreachable: 15 s every time');
+  off.timers[off.timers.length - 1].fn();
+}
+assert.strictEqual(off.sources.length, 5, 'subscribes again as soon as the PC is back');
+// Hidden while the GET was out: no retry scheduled.
+off.sources[4].readyState = 2;
+off.sources[4].onerror();
+var before = off.timers.length;
+off.Videos.disconnect();
+off.requests[4].onerror();
+assert.strictEqual(off.timers.length, before);
 
 // Without EventSource: a GET when shown, and the tick reads again only after 5 minutes.
 var p = setup(null, undefined, false);

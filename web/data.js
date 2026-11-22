@@ -859,9 +859,11 @@ var Data = (function () {
  * Observer: while the home screen shows, an EventSource on the same URL subscribes to the server (Accept:
  * text/event-stream). The server sends the current feed at once, then a `feed` event only when a list changes, so the
  * TV never polls. Hidden, the connection closes (Tizen suspends hidden apps anyway); shown again, it opens again and
- * the first event brings what it missed. A dropped connection comes back by itself (the server's `retry:`); a server
- * that refuses the stream (an older bot) gets a single JSON GET and another try later, 1 minute at first and up to
- * 30. TVs without EventSource (Tizen 2.x) read the JSON when the app shows and every 5 minutes.
+ * the first event brings what it missed. A dropped connection comes back by itself (the server's `retry:`). A stream
+ * that ends CLOSED gets a single JSON GET: when nothing answers it (the PC is off or still booting, which Tizen's
+ * EventSource reports as CLOSED too), it tries again every 15 seconds; when the server answers but refuses the stream
+ * (an older bot), it tries later, 1 minute at first and up to 30. TVs without EventSource (Tizen 2.x) read the JSON
+ * when the app shows and every 5 minutes.
  *
  * The last feed is kept in localStorage, but only today's is ever shown (its `date` against the TV's own date, checked
  * every 30 seconds without the network): without one, the row is gone.
@@ -869,7 +871,7 @@ var Data = (function () {
 var Videos = (function () {
   'use strict';
   var URL_ = CONFIG.videoFeedUrl || '', KEY = 'fmtv.videos', POLL = 5 * 60000, MAX = 30;
-  var RETRY_FIRST = 60000, RETRY_MAX = 30 * 60000;
+  var RETRY_FIRST = 60000, RETRY_MAX = 30 * 60000, RETRY_OFFLINE = 15000;
   var feed = null, fetchedAt = 0, busy = false, listeners = [], shownKey = '';
   var source = null, retryIn = RETRY_FIRST, retryTimer = 0, wanted = false;
   var streams = typeof window !== 'undefined' && typeof window.EventSource === 'function';
@@ -912,19 +914,23 @@ var Videos = (function () {
     changed();
   }
 
-  /** One GET of the JSON: TVs without EventSource, and while a refused stream waits to try again. */
-  function refresh(force) {
+  /**
+   * One GET of the JSON: TVs without EventSource, and after a stream ends CLOSED. `done(reached)`, if given, hears
+   * whether the server answered at all (false: offline, or a GET already on its way).
+   */
+  function refresh(force, done) {
     if (!URL_) return;
     changed();   // a new day empties the row even before the server answers
-    if (busy || (!force && Date.now() - fetchedAt < POLL)) return;
+    if (busy || (!force && Date.now() - fetchedAt < POLL)) { if (done) done(false); return; }
     busy = true;
     var x = new XMLHttpRequest(), over = false;
-    function finish(json) {
+    function finish(json, reached) {
       if (over) return;
       over = true;
       busy = false;
       fetchedAt = Date.now();
       if (json) receive(json); else changed();
+      if (done) done(reached);
     }
     x.open('GET', URL_, true);
     x.timeout = 8000;
@@ -932,9 +938,9 @@ var Videos = (function () {
       if (x.readyState !== 4 || over) return;
       var json = null;
       if (x.status === 200) { try { json = JSON.parse(x.responseText); } catch (e) {} }
-      finish(json);
+      finish(json, x.status > 0);
     };
-    x.ontimeout = x.onerror = function () { finish(null); };   // offline: the kept feed stays, if it's today's
+    x.ontimeout = x.onerror = function () { finish(null, false); };   // offline: the kept feed stays, if it's today's
     x.send();
   }
 
@@ -950,12 +956,17 @@ var Videos = (function () {
       if (json) receive(json);
     });
     source.onerror = function () {
-      // CONNECTING: the browser tries again by itself. CLOSED: the server refused the stream; read it once, retry later.
+      // CONNECTING: the browser tries again by itself. CLOSED: read it once; then the PC being off retries soon, and
+      // a server that answers but refuses the stream waits twice as long each time.
       if (!source || source.readyState !== 2) return;
       source = null;
-      refresh(true);
-      if (wanted) retryTimer = setTimeout(subscribe, retryIn);
-      retryIn = Math.min(RETRY_MAX, retryIn * 2);
+      refresh(true, function (reached) {
+        if (!wanted || source) return;
+        clearTimeout(retryTimer);
+        if (!reached) { retryTimer = setTimeout(subscribe, RETRY_OFFLINE); return; }
+        retryTimer = setTimeout(subscribe, retryIn);
+        retryIn = Math.min(RETRY_MAX, retryIn * 2);
+      });
     };
   }
 
